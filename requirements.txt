@@ -1,0 +1,8 @@
+aiofiles
+aiohttp
+asyncpraw
+dotenv
+imagehash
+numpy
+Pillow
+tqdm

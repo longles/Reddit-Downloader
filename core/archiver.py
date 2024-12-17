@@ -92,7 +92,7 @@ class RedditArchiver:
             if self._reddit:
                 await self._reddit.close()
 
-    async def _process_submission(
+    async def process_submission(
         self, session: aiohttp.ClientSession, submission: SubmissionData, path: Path
     ) -> None:
         try:
@@ -108,7 +108,7 @@ class RedditArchiver:
         except Exception:
             pass
 
-    async def _process_gallery(
+    async def process_gallery(
         self, session: aiohttp.ClientSession, submission: SubmissionData, path: Path
     ) -> int:
         if not submission.media_metadata:
@@ -127,7 +127,7 @@ class RedditArchiver:
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return sum(1 for r in results if isinstance(r, bool) and r)
 
-    async def _process_single(
+    async def process_single(
         self, session: aiohttp.ClientSession, submission: SubmissionData, path: Path
     ) -> bool:
         ext = self.extract_file_extension(submission.url)
@@ -141,7 +141,7 @@ class RedditArchiver:
             session, submission.url, path, filename
         )
 
-    async def _write_archive_info(
+    async def write_archive_info(
         self, path: Path, submissions: List[SubmissionData], duplicates_removed: int
     ) -> None:
         async with aiofiles.open(path / "archive_info.txt", "w") as f:
