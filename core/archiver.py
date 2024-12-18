@@ -70,7 +70,7 @@ class RedditArchiver:
 
             async with aiohttp.ClientSession() as session:
                 tasks = [
-                    self._process_submission(session, sub, download_path)
+                    self.process_submission(session, sub, download_path)
                     for sub in submissions
                 ]
                 for task in tqdm(
@@ -84,7 +84,7 @@ class RedditArchiver:
             duplicates_removed = await remove_duplicates(
                 download_path, self.config.valid_formats
             )
-            await self._write_archive_info(
+            await self.write_archive_info(
                 download_path, submissions, duplicates_removed
             )
 
@@ -97,14 +97,14 @@ class RedditArchiver:
     ) -> None:
         try:
             if submission.has_gallery:
-                await self._process_gallery(session, submission, path)
+                await self.process_gallery(session, submission, path)
             else:
                 direct_url = await self.downloader.get_direct_url(
                     session, submission.url
                 )
                 if direct_url:
                     submission.url = direct_url
-                    await self._process_single(session, submission, path)
+                    await self.process_single(session, submission, path)
         except Exception:
             pass
 
