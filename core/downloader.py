@@ -8,7 +8,6 @@ import aiohttp
 from tqdm import tqdm
 
 from config.config import Config
-from core.exceptions import DownloadError
 
 
 class Downloader:
@@ -46,17 +45,16 @@ class Downloader:
                 await asyncio.to_thread(temp_filepath.replace, filepath)
                 return True
 
-            except Exception as e:
+            except Exception:
                 if temp_filepath.exists():
                     await asyncio.to_thread(temp_filepath.unlink)
-                raise DownloadError(f"Failed to download {url}: {str(e)}")
 
     async def get_direct_url(
         self, session: aiohttp.ClientSession, url: str
     ) -> Optional[str]:
         """Get direct downloadable URL from various sources."""
-        if "redgifs.com" in url:
-            try:
+        try:
+            if "redgifs.com" in url:
                 async with session.get(url) as response:
                     response.raise_for_status()
                     html = await response.text()
@@ -64,7 +62,6 @@ class Downloader:
                     r"(https://files\.redgifs\.com/.*?-mobile\.jpg)", html
                 ):
                     return match.group(1).replace("-mobile.jpg", ".mp4")
-            except Exception as e:
-                print(f"Failed to process redgifs URL: {e}")
-                return None
+        except Exception:
+            return None
         return url
