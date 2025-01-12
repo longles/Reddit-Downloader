@@ -2,11 +2,9 @@ import asyncio
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
-
+from typing import Dict, List, Set
 import aiofiles
 import imagehash
-import numpy as np
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
@@ -16,33 +14,6 @@ Image.MAX_IMAGE_PIXELS = None
 class FileHash:
     path: Path
     hash_value: str
-
-
-def alpharemover(image: Image.Image) -> Image.Image:
-    if image.mode != "RGBA":
-        return image
-    canvas = Image.new("RGBA", image.size, (255, 255, 255, 255))
-    canvas.paste(image, mask=image)
-    return canvas.convert("RGB")
-
-
-def with_ztransform_preprocess(hashfunc, hash_size=8):
-    def function(path):
-        image = alpharemover(Image.open(path))
-        image = image.convert("L").resize((hash_size, hash_size), Image.LANCZOS)
-        data = image.getdata()
-        quantiles = np.arange(100)
-        quantiles_values = np.percentile(data, quantiles)
-        zdata = (np.interp(data, quantiles_values, quantiles) / 100 * 255).astype(
-            np.uint8
-        )
-        image.putdata(zdata)
-        return hashfunc(image)
-
-    return function
-
-
-dhash_z_transformed = with_ztransform_preprocess(imagehash.dhash, hash_size=8)
 
 
 class DuplicateHandler:
@@ -60,25 +31,18 @@ class DuplicateHandler:
             print(f"Error calculating hash for {file_path}: {e}")
             return ""
 
-    async def get_image_hash(self, file: Path) -> Tuple[Path, str]:
+    async def get_image_hash(self, file: Path) -> FileHash:
         try:
-            if hash_value := await asyncio.get_event_loop().run_in_executor(
-                None, dhash_z_transformed, str(file)
-            ):
-                return FileHash(file, str(hash_value))
+            image = Image.open(file).convert("RGB")
+            hash_value = imagehash.dhash(image)
+            return FileHash(file, str(hash_value))
         except Exception as e:
             print(f"Error hashing image {file}: {e}")
         return FileHash(file, "")
 
-    async def get_video_hash(self, file: Path) -> Tuple[Path, str]:
-        hash_value = await self.calculate_file_hash(file)
-        return FileHash(file, hash_value)
-
     async def remove_duplicates(self, path: Path, valid_formats: Set[str]) -> int:
         files = [f for f in path.glob("*") if f.suffix.lower() in valid_formats]
-        image_files = [
-            f for f in files if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".gif"}
-        ]
+        image_files = [f for f in files if f.suffix.lower() != ".mp4"]
         video_files = [f for f in files if f.suffix.lower() == ".mp4"]
 
         removed = 0
@@ -98,12 +62,12 @@ class DuplicateHandler:
         if video_files:
             hash_map: Dict[str, List[Path]] = {}
             hash_results = await asyncio.gather(
-                *[self.get_video_hash(f) for f in video_files]
+                *[self.calculate_file_hash(f) for f in video_files]
             )
 
-            for file_hash in hash_results:
-                if file_hash.hash_value:
-                    hash_map.setdefault(file_hash.hash_value, []).append(file_hash.path)
+            for file_hash, path in zip(hash_results, video_files):
+                if file_hash:
+                    hash_map.setdefault(file_hash, []).append(path)
 
             removed += await self._remove_duplicates_from_map(hash_map)
 
