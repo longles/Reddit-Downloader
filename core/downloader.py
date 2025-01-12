@@ -18,7 +18,6 @@ class Downloader:
     async def download_file(
         self, session: aiohttp.ClientSession, url: str, path: Path, filename: str
     ) -> bool:
-        """Download a file from URL to specified path."""
         async with self._download_semaphore:
             try:
                 filepath = path / filename
@@ -52,7 +51,6 @@ class Downloader:
     async def get_direct_url(
         self, session: aiohttp.ClientSession, url: str
     ) -> Optional[str]:
-        """Get direct downloadable URL from various sources."""
         try:
             if "redgifs.com" in url:
                 async with session.get(url) as response:

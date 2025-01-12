@@ -58,15 +58,15 @@ class RedditArchiver:
         return submissions
 
     async def archive_user(self, username: str) -> None:
-        download_path = Path("downloads") / username
-        download_path.mkdir(parents=True, exist_ok=True)
-
         try:
             submissions = await self.get_submissions(
                 username, self.config.download_limit
             )
             if not submissions:
                 return
+
+            download_path = Path("downloads") / username
+            download_path.mkdir(parents=True, exist_ok=True)
 
             async with aiohttp.ClientSession() as session:
                 tasks = [
