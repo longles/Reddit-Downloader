@@ -1,7 +1,7 @@
 aiofiles
 aiohttp
 asyncpraw
-dotenv
+python-dotenv
 imagehash
 numpy
 Pillow
