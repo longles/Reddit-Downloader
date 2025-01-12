@@ -3,9 +3,10 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Set
-import aiofiles
+
 import imagehash
 from PIL import Image
+
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -20,18 +21,8 @@ class DuplicateHandler:
     def __init__(self, chunk_size: int = 65536):
         self.chunk_size = chunk_size
 
-    async def calculate_file_hash(self, file_path: Path) -> str:
-        sha256_hash = hashlib.sha256()
-        try:
-            async with aiofiles.open(file_path, "rb") as f:
-                while chunk := await f.read(self.chunk_size):
-                    sha256_hash.update(chunk)
-            return sha256_hash.hexdigest()
-        except Exception as e:
-            print(f"Error calculating hash for {file_path}: {e}")
-            return ""
-
-    async def get_image_hash(self, file: Path) -> FileHash:
+    @staticmethod
+    def get_image_hash_sync(file: Path) -> FileHash:
         try:
             image = Image.open(file).convert("RGB")
             hash_value = imagehash.dhash(image)
@@ -39,6 +30,18 @@ class DuplicateHandler:
         except Exception as e:
             print(f"Error hashing image {file}: {e}")
         return FileHash(file, "")
+
+    @staticmethod
+    def calculate_file_hash_sync(file_path: Path, chunk_size: int) -> str:
+        sha256_hash = hashlib.sha256()
+        try:
+            with open(file_path, "rb") as f:
+                while chunk := f.read(chunk_size):
+                    sha256_hash.update(chunk)
+            return sha256_hash.hexdigest()
+        except Exception as e:
+            print(f"Error calculating hash for {file_path}: {e}")
+            return ""
 
     async def remove_duplicates(self, path: Path, valid_formats: Set[str]) -> int:
         files = [f for f in path.glob("*") if f.suffix.lower() in valid_formats]
@@ -50,7 +53,7 @@ class DuplicateHandler:
         if image_files:
             hash_map: Dict[str, List[Path]] = {}
             hash_results = await asyncio.gather(
-                *[self.get_image_hash(f) for f in image_files]
+                *[asyncio.to_thread(self.get_image_hash_sync, f) for f in image_files]
             )
 
             for file_hash in hash_results:
@@ -62,7 +65,10 @@ class DuplicateHandler:
         if video_files:
             hash_map: Dict[str, List[Path]] = {}
             hash_results = await asyncio.gather(
-                *[self.calculate_file_hash(f) for f in video_files]
+                *[
+                    asyncio.to_thread(self.calculate_file_hash_sync, f, self.chunk_size)
+                    for f in video_files
+                ]
             )
 
             for file_hash, path in zip(hash_results, video_files):
