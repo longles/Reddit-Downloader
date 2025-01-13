@@ -22,7 +22,7 @@ class DuplicateHandler:
         self.chunk_size = chunk_size
 
     @staticmethod
-    def get_image_hash_sync(file: Path) -> FileHash:
+    def get_image_hash(file: Path) -> FileHash:
         try:
             image = Image.open(file).convert("RGB")
             hash_value = imagehash.dhash(image)
@@ -32,54 +32,45 @@ class DuplicateHandler:
         return FileHash(file, "")
 
     @staticmethod
-    def calculate_file_hash_sync(file_path: Path, chunk_size: int) -> str:
+    def get_file_hash(file: Path, chunk_size: int) -> FileHash:
         sha256_hash = hashlib.sha256()
         try:
-            with open(file_path, "rb") as f:
+            with open(file, "rb") as f:
                 while chunk := f.read(chunk_size):
                     sha256_hash.update(chunk)
-            return sha256_hash.hexdigest()
+            return FileHash(file, sha256_hash.hexdigest())
         except Exception as e:
-            print(f"Error calculating hash for {file_path}: {e}")
-            return ""
+            print(f"Error calculating hash for {file}: {e}")
+            return FileHash(file, "")
 
     async def remove_duplicates(self, path: Path, valid_formats: Set[str]) -> int:
         files = [f for f in path.glob("*") if f.suffix.lower() in valid_formats]
         image_files = [f for f in files if f.suffix.lower() != ".mp4"]
         video_files = [f for f in files if f.suffix.lower() == ".mp4"]
 
-        removed = 0
+        hash_map: Dict[str, List[Path]] = {}
+        image_hash = video_hash = []
 
         if image_files:
-            hash_map: Dict[str, List[Path]] = {}
-            hash_results = await asyncio.gather(
-                *[asyncio.to_thread(self.get_image_hash_sync, f) for f in image_files]
+            image_hash = await asyncio.gather(
+                *[asyncio.to_thread(self.get_image_hash, f) for f in image_files]
             )
 
-            for file_hash in hash_results:
-                if file_hash.hash_value:
-                    hash_map.setdefault(file_hash.hash_value, []).append(file_hash.path)
-
-            removed += await self._remove_duplicates_from_map(hash_map)
-
         if video_files:
-            hash_map: Dict[str, List[Path]] = {}
-            hash_results = await asyncio.gather(
+            video_hash = await asyncio.gather(
                 *[
-                    asyncio.to_thread(self.calculate_file_hash_sync, f, self.chunk_size)
+                    asyncio.to_thread(self.get_file_hash, f, self.chunk_size)
                     for f in video_files
                 ]
             )
 
-            for file_hash, path in zip(hash_results, video_files):
-                if file_hash:
-                    hash_map.setdefault(file_hash, []).append(path)
+        for file_hash in image_hash + video_hash:
+            if file_hash.hash_value:
+                hash_map.setdefault(file_hash.hash_value, []).append(file_hash.path)
 
-            removed += await self._remove_duplicates_from_map(hash_map)
+        return await self.remove_duplicates_from_map(hash_map)
 
-        return removed
-
-    async def _remove_duplicates_from_map(self, hash_map: Dict[str, List[Path]]) -> int:
+    async def remove_duplicates_from_map(self, hash_map: Dict[str, List[Path]]) -> int:
         removed = 0
         for files in hash_map.values():
             if len(files) <= 1:
