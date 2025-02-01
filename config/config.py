@@ -10,7 +10,7 @@ class Config:
     username: str
     password: str
     user_agent: str = "windows:reddit-archiver:v1.0"
-    valid_formats: FrozenSet[str] = frozenset((".jpg", ".jpeg", ".png", ".gif", ".mp4"))
+    valid_formats: FrozenSet[str] = frozenset(("jpg", "jpeg", "png", "gif", "mp4"))
     chunk_size: int = 32768
     max_concurrent_downloads: int = 10
     download_limit: int = 100

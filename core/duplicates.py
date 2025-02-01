@@ -2,11 +2,10 @@ import asyncio
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Tuple
 
 import imagehash
 from PIL import Image
-
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -25,8 +24,7 @@ class DuplicateHandler:
     def get_image_hash(file: Path) -> FileHash:
         try:
             image = Image.open(file).convert("RGB")
-            hash_value = imagehash.dhash(image)
-            return FileHash(file, str(hash_value))
+            return FileHash(file, str(imagehash.dhash(image)))
         except Exception as e:
             print(f"Error hashing image {file}: {e}")
         return FileHash(file, "")
@@ -36,7 +34,7 @@ class DuplicateHandler:
         sha256_hash = hashlib.sha256()
         try:
             with open(file, "rb") as f:
-                while chunk := f.read(chunk_size):
+                for chunk in iter(lambda: f.read(chunk_size), b""):
                     sha256_hash.update(chunk)
             return FileHash(file, sha256_hash.hexdigest())
         except Exception as e:
@@ -44,27 +42,29 @@ class DuplicateHandler:
             return FileHash(file, "")
 
     async def remove_duplicates(self, path: Path, valid_formats: Set[str]) -> int:
-        files = [f for f in path.glob("*") if f.suffix.lower() in valid_formats]
-        image_files = [f for f in files if f.suffix.lower() != ".mp4"]
-        video_files = [f for f in files if f.suffix.lower() == ".mp4"]
+        files = [
+            (f, f.suffix.lower() == ".mp4")
+            for f in path.glob("*")
+            if f.suffix.lower() in valid_formats
+        ]
+
+        if not files:
+            return 0
 
         hash_map: Dict[str, List[Path]] = {}
-        image_hash = video_hash = []
+        tasks = []
 
-        if image_files:
-            image_hash = await asyncio.gather(
-                *[asyncio.to_thread(self.get_image_hash, f) for f in image_files]
-            )
+        for file, is_video in files:
+            if is_video:
+                tasks.append(
+                    asyncio.to_thread(self.get_file_hash, file, self.chunk_size)
+                )
+            else:
+                tasks.append(asyncio.to_thread(self.get_image_hash, file))
 
-        if video_files:
-            video_hash = await asyncio.gather(
-                *[
-                    asyncio.to_thread(self.get_file_hash, f, self.chunk_size)
-                    for f in video_files
-                ]
-            )
+        file_hashes = await asyncio.gather(*tasks)
 
-        for file_hash in image_hash + video_hash:
+        for file_hash in file_hashes:
             if file_hash.hash_value:
                 hash_map.setdefault(file_hash.hash_value, []).append(file_hash.path)
 

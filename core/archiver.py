@@ -59,10 +59,11 @@ class RedditArchiver:
 
     async def archive_user(self, username: str) -> None:
         try:
-            submissions = await self.get_submissions(
-                username, self.config.download_limit
-            )
-            if not submissions:
+            if not (
+                submissions := await self.get_submissions(
+                    username, self.config.download_limit
+                )
+            ):
                 return
 
             download_path = Path("downloads") / username
@@ -87,7 +88,6 @@ class RedditArchiver:
             await self.write_archive_info(
                 download_path, submissions, duplicates_removed
             )
-
         finally:
             if self._reddit:
                 await self._reddit.close()
@@ -99,10 +99,9 @@ class RedditArchiver:
             if submission.has_gallery:
                 await self.process_gallery(session, submission, path)
             else:
-                direct_url = await self.downloader.get_direct_url(
+                if direct_url := await self.downloader.get_direct_url(
                     session, submission.url
-                )
-                if direct_url:
+                ):
                     submission.url = direct_url
                     await self.process_single(session, submission, path)
         except Exception:
@@ -110,36 +109,26 @@ class RedditArchiver:
 
     async def process_gallery(
         self, session: aiohttp.ClientSession, submission: SubmissionData, path: Path
-    ) -> int:
+    ) -> None:
         if not submission.media_metadata:
-            return 0
+            return
 
-        tasks = []
         for idx, (_, image_data) in enumerate(submission.media_metadata.items(), 1):
             img_url = image_data["s"].get("u") or image_data["s"].get("gif")
             ext = self.extract_file_extension(img_url)
             if img_url and ext:
                 filename = f"{submission.date_str}-{submission.id}-{idx}.{ext}"
-                tasks.append(
-                    self.downloader.download_file(session, img_url, path, filename)
-                )
-
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        return sum(1 for r in results if isinstance(r, bool) and r)
+                await self.downloader.download_file(session, img_url, path, filename)
 
     async def process_single(
         self, session: aiohttp.ClientSession, submission: SubmissionData, path: Path
-    ) -> bool:
-        ext = self.extract_file_extension(submission.url)
-        if not ext or ext.lower() not in {
-            fmt.strip(".") for fmt in self.config.valid_formats
-        }:
-            return False
+    ) -> None:
+        ext = self.extract_file_extension(submission.url).lower()
+        if ext not in self.config.valid_formats:
+            return
 
         filename = f"{submission.date_str}-{submission.id}.{ext}"
-        return await self.downloader.download_file(
-            session, submission.url, path, filename
-        )
+        await self.downloader.download_file(session, submission.url, path, filename)
 
     async def write_archive_info(
         self, path: Path, submissions: List[SubmissionData], duplicates_removed: int
