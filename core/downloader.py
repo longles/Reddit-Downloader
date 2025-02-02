@@ -14,7 +14,7 @@ class Downloader:
     def __init__(self, config: Config):
         self.config = config
         self._download_semaphore = asyncio.Semaphore(config.max_concurrent_downloads)
-        self._seen_urls: Set[str] = set()
+        self._seen_urls: Set[str] = set() 
 
     async def is_url_seen(self, url: str) -> bool:
         return url in self._seen_urls

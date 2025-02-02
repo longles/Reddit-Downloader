@@ -34,7 +34,7 @@ class DuplicateHandler:
         sha256_hash = hashlib.sha256()
         try:
             with open(file, "rb") as f:
-                for chunk in iter(lambda: f.read(chunk_size), b""):
+                while chunk := f.read(chunk_size):
                     sha256_hash.update(chunk)
             return FileHash(file, sha256_hash.hexdigest())
         except Exception as e:
@@ -45,7 +45,7 @@ class DuplicateHandler:
         files = [
             (f, f.suffix.lower() == ".mp4")
             for f in path.glob("*")
-            if f.suffix.lower() in valid_formats
+            if f.suffix.lower()[1:] in valid_formats
         ]
 
         if not files:
