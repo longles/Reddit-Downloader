@@ -19,13 +19,8 @@ from models.submission import SubmissionData
 class RedditArchiver:
     """Downloads and archives Reddit user submissions."""
 
-    def __init__(
-        self,
-        env_path: str,
-        concurrent_downloads: Optional[int] = None,
-        download_limit: Optional[int] = None,
-    ):
-        self.config = Config.from_env(env_path, concurrent_downloads, download_limit)
+    def __init__(self, config: Config):
+        self.config = config
         self._reddit: Optional[asyncpraw.Reddit] = None
         self.downloader = Downloader(self.config)
 
@@ -113,12 +108,16 @@ class RedditArchiver:
         if not submission.media_metadata:
             return
 
+        tasks = []
         for idx, (_, image_data) in enumerate(submission.media_metadata.items(), 1):
             img_url = image_data["s"].get("u") or image_data["s"].get("gif")
             ext = self.extract_file_extension(img_url)
             if img_url and ext:
                 filename = f"{submission.date_str}-{submission.id}-{idx}.{ext}"
-                await self.downloader.download_file(session, img_url, path, filename)
+                tasks.append(
+                    self.downloader.download_file(session, img_url, path, filename)
+                )
+        await asyncio.gather(*tasks)
 
     async def process_single(
         self, session: aiohttp.ClientSession, submission: SubmissionData, path: Path

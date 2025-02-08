@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set
 
 import imagehash
 from PIL import Image

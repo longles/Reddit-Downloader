@@ -14,7 +14,7 @@ class Downloader:
     def __init__(self, config: Config):
         self.config = config
         self._download_semaphore = asyncio.Semaphore(config.max_concurrent_downloads)
-        self._seen_urls: Set[str] = set() 
+        self._seen_urls: Set[str] = set()
 
     async def is_url_seen(self, url: str) -> bool:
         return url in self._seen_urls
@@ -42,6 +42,7 @@ class Downloader:
                     unit_scale=True,
                     desc=filename,
                     leave=False,
+                    disable=not self.config.download_bars,
                 ) as pbar:
                     async with aiofiles.open(temp_filepath, "wb") as f:
                         async for chunk in response.content.iter_chunked(
@@ -69,6 +70,9 @@ class Downloader:
                     r"(https://media\.redgifs\.com/.*?-mobile\.jpg)", html
                 ):
                     return match.group(1).replace("-mobile.jpg", ".mp4")
+            if "vidble.com" in url:
+                vid_id = url.split("=")[1]
+                return f"https://vidble.com/{vid_id}.mp4"
         except Exception:
             return None
         return url

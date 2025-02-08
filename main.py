@@ -2,6 +2,7 @@ import argparse
 import asyncio
 
 from core.archiver import RedditArchiver
+from config.config import Config
 
 
 def main() -> None:
@@ -12,9 +13,15 @@ def main() -> None:
     parser.add_argument(
         "-c", "--concurrent", type=int, help="Number of concurrent downloads"
     )
+    parser.add_argument(
+        "-d", "--download-bars", action="store_true", help="Show download bars"
+    )
     args = parser.parse_args()
 
-    archiver = RedditArchiver("./reddit.env", args.concurrent, args.limit)
+    config = Config.from_env(
+        "./reddit.env", args.concurrent, args.limit, args.download_bars
+    )
+    archiver = RedditArchiver(config)
     asyncio.run(archiver.archive_user(args.username))
 
 
