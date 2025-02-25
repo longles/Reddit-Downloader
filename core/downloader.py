@@ -70,7 +70,7 @@ class Downloader:
                     r"(https://media\.redgifs\.com/.*?-mobile\.jpg)", html
                 ):
                     return match.group(1).replace("-mobile.jpg", ".mp4")
-            if "vidble.com" in url:
+            if "vidble.com/watch" in url:
                 vid_id = url.split("=")[1]
                 return f"https://vidble.com/{vid_id}.mp4"
         except Exception:
