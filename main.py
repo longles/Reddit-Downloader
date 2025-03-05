@@ -1,28 +1,36 @@
-import argparse
 import asyncio
+from typing import List
 
-from core.archiver import RedditArchiver
 from config.config import Config
+from core.archiver import RedditArchiver
+from utils.cli import parse_arguments
+
+
+async def process_users(archiver: RedditArchiver, usernames: List[str]) -> None:
+    """Process multiple usernames sequentially."""
+    try:
+        for username in usernames:
+            await archiver.archive_user(username)
+    finally:
+        await archiver.close()
 
 
 def main() -> None:
     """CLI entry point for Reddit archiver."""
-    parser = argparse.ArgumentParser(description="Archive Reddit user submissions")
-    parser.add_argument("username", help="Reddit username")
-    parser.add_argument("-l", "--limit", type=int, help="Submission limit")
-    parser.add_argument(
-        "-c", "--concurrent", type=int, help="Number of concurrent downloads"
-    )
-    parser.add_argument(
-        "-d", "--download-bars", action="store_true", help="Show download bars"
-    )
-    args = parser.parse_args()
+    usernames, limit, concurrent, download_bars = parse_arguments()
 
+    if not usernames:
+        print("No usernames found to process")
+        return
+
+    # Create config and archiver
     config = Config.from_env(
-        "./reddit.env", args.concurrent, args.limit, args.download_bars
+        "./reddit.env", concurrent, limit, download_bars
     )
     archiver = RedditArchiver(config)
-    asyncio.run(archiver.archive_user(args.username))
+
+    # Process all usernames
+    asyncio.run(process_users(archiver, usernames))
 
 
 if __name__ == "__main__":

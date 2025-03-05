@@ -7,6 +7,7 @@ Reddit Archiver is a tool to download and archive Reddit user submissions. It su
 - Download images, videos, and galleries from Reddit user submissions
 - Remove duplicate files
 - Configurable download limits and concurrency
+- Process multiple users from file or existing folders
 
 ## Installation
 
@@ -32,6 +33,13 @@ Reddit Archiver is a tool to download and archive Reddit user submissions. It su
 ## Usage
 
 Run the archiver from the command line:
-```python
-python main.py <reddit-username> [-l <submission-limit>] [-c <concurrent-downloads>]
-```
+
+```shell
+# Single user
+python main.py --username <reddit-username> [-l <limit>] [-c <concurrent>] [-d]
+
+# Multiple users from a file
+python main.py --from-file <file-path> [-l <limit>] [-c <concurrent>] [-d]
+
+# Users from existing folders
+python main.py --from-folders [-l <limit>] [-c <concurrent>] [-d]
