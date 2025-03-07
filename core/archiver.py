@@ -62,16 +62,13 @@ class RedditArchiver:
             download_path.mkdir(parents=True, exist_ok=True)
 
             await self._process_submissions(username, submissions, download_path)
-
-            duplicates_removed = await remove_duplicates(
-                download_path, self.config.valid_formats
-            )
-
-            print(f"Duplicates removed for u/{username}: {duplicates_removed}")
+            await remove_duplicates(download_path, self.config.valid_formats)
         except Exception as e:
             print(f"Error processing user {username}: {e}")
 
-    async def _process_submissions(self, username: str, submissions: List[SubmissionData], download_path: Path) -> None:
+    async def _process_submissions(
+        self, username: str, submissions: List[SubmissionData], download_path: Path
+    ) -> None:
         """Process all submissions for a user."""
         async with aiohttp.ClientSession() as session:
             tasks = [
