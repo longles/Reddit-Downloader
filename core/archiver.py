@@ -2,7 +2,7 @@ import asyncio
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import aiofiles
 import aiohttp
@@ -22,6 +22,7 @@ class RedditArchiver:
         self.config = config
         self._reddit: Optional[asyncpraw.Reddit] = None
         self.downloader = Downloader(self.config)
+        self.processed_paths: Set[Path] = set()
 
     async def get_reddit(self) -> asyncpraw.Reddit:
         """Get or create the Reddit client."""
@@ -44,7 +45,7 @@ class RedditArchiver:
             async for submission in user.submissions.new(limit=limit):
                 submissions.append(SubmissionData.from_praw_submission(submission))
         except Exception as e:
-            print(f"Error fetching submissions for {username}: {e}")
+            print(f"[ERROR] Failed to fetch submissions for u/{username}: {e}")
         return submissions
 
     async def archive_user(self, username: str) -> None:
@@ -55,16 +56,35 @@ class RedditArchiver:
                     username, self.config.download_limit
                 )
             ):
-                print(f"No submissions found for {username}")
+                print(f"[INFO] No submissions found for u/{username}")
                 return
 
             download_path = Path("downloads") / username
             download_path.mkdir(parents=True, exist_ok=True)
+            self.processed_paths.add(download_path)
 
             await self._process_submissions(username, submissions, download_path)
-            await remove_duplicates(download_path, self.config.valid_formats)
+            # Remove duplicate removal from here - will be done at the end
         except Exception as e:
-            print(f"Error processing user {username}: {e}")
+            print(f"[ERROR] Failed to process user u/{username}: {e}")
+
+    async def remove_all_duplicates(self) -> None:
+        """Remove duplicates from all processed user directories."""
+        if not self.processed_paths:
+            print("[INFO] No directories to check for duplicates")
+            return
+
+        print("[INFO] Removing duplicates across all downloaded content...")
+        removed_count = 0
+        for path in tqdm(
+            self.processed_paths,
+            desc="Removing duplicates",
+            unit="user"
+        ):
+            count = await remove_duplicates(path, self.config.valid_formats)
+            removed_count += count
+
+        print(f"[SUCCESS] Removed {removed_count} duplicate files")
 
     async def _process_submissions(
         self, username: str, submissions: List[SubmissionData], download_path: Path
@@ -78,7 +98,7 @@ class RedditArchiver:
             for task in tqdm(
                 asyncio.as_completed(tasks),
                 total=len(submissions),
-                desc=f"Archiving u/{username}",
+                desc=f"Processing u/{username}",
                 unit="post",
             ):
                 await task
@@ -133,8 +153,8 @@ class RedditArchiver:
         self, session: aiohttp.ClientSession, submission: SubmissionData, path: Path
     ) -> None:
         """Process a single media submission."""
-        ext = self.extract_file_extension(submission.url).lower()
-        if ext not in self.config.valid_formats:
+        ext = self.extract_file_extension(submission.url)
+        if not ext or ext.lower() not in self.config.valid_formats:
             return
 
         filename = f"{submission.date_str}-{submission.id}.{ext}"

@@ -28,6 +28,7 @@ class Downloader:
         if await self.is_url_seen(url):
             return
 
+        temp_filepath = None
         try:
             filepath = path / filename
             temp_filepath = filepath.with_suffix(".tmp")
@@ -54,8 +55,8 @@ class Downloader:
             await asyncio.to_thread(temp_filepath.replace, filepath)
             await self.mark_url_seen(url)
 
-        except Exception:
-            if temp_filepath.exists():
+        except Exception as e:
+            if temp_filepath and temp_filepath.exists():
                 await asyncio.to_thread(temp_filepath.unlink)
 
     async def get_direct_url(

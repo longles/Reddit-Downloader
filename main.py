@@ -7,10 +7,14 @@ from utils.cli import parse_arguments
 
 
 async def process_users(archiver: RedditArchiver, usernames: List[str]) -> None:
-    """Process multiple usernames sequentially."""
+    """Process multiple usernames and remove duplicates at the end."""
     try:
+        print(f"[INFO] Starting archive process for {len(usernames)} users")
         for username in usernames:
             await archiver.archive_user(username)
+
+        # Remove duplicates after all users have been processed
+        await archiver.remove_all_duplicates()
     finally:
         await archiver.close()
 
@@ -20,7 +24,7 @@ def main() -> None:
     usernames, limit, concurrent, download_bars = parse_arguments()
 
     if not usernames:
-        print("No usernames found to process")
+        print("[ERROR] No usernames found to process")
         return
 
     # Create config and archiver
@@ -31,6 +35,7 @@ def main() -> None:
 
     # Process all usernames
     asyncio.run(process_users(archiver, usernames))
+    print("[SUCCESS] Archive process complete")
 
 
 if __name__ == "__main__":
